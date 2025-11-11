@@ -2,11 +2,18 @@ import streamlit as st
 import os
 import traceback
 
-if hasattr(st, 'secrets') and 'GROQ_API_KEY' in st.secrets:
-    os.environ['GROQ_API_KEY'] = st.secrets['GROQ_API_KEY']
+st.sidebar.write("### Secrets Debug")
+st.sidebar.write(f"Has secrets: {hasattr(st, 'secrets')}")
+
+if hasattr(st, 'secrets'):
+    st.sidebar.write(f"All secrets: {list(st.secrets.keys())}")
+    if 'GROQ_API_KEY' in st.secrets:
+        st.sidebar.write(f"API Key found: {st.secrets['GROQ_API_KEY'][:10]}...")
+        os.environ['GROQ_API_KEY'] = st.secrets['GROQ_API_KEY']
+    else:
+        st.sidebar.write("❌ GROQ_API_KEY not found in secrets")
 else:
     from dotenv import load_dotenv
-
     load_dotenv()
 
 st.set_page_config(
@@ -46,7 +53,6 @@ st.markdown("""
 st.markdown('<h1 class="main-header">⚖️ Law Study Buddy</h1>', unsafe_allow_html=True)
 st.markdown("### AI-Powered Legal Research Assistant")
 
-
 @st.cache_resource
 def load_rag_components():
     try:
@@ -76,7 +82,6 @@ def load_rag_components():
         st.sidebar.error(f"❌ RAG initialization failed: {str(e)}")
         st.sidebar.code(traceback.format_exc())
         return None, None
-
 
 with st.sidebar:
     st.header("⚙️ Settings")
