@@ -16,6 +16,8 @@ else:
     from dotenv import load_dotenv
     load_dotenv()
 
+from RagFullPipeline import rag_advanced, initialize_llm, RagRetriever, EmbeddingManager, VectorStore
+
 st.set_page_config(
     page_title="Law Study Buddy",
     page_icon="⚖️",
@@ -56,8 +58,6 @@ st.markdown("### AI-Powered Legal Research Assistant")
 @st.cache_resource
 def load_rag_components():
     try:
-        from RagFullPipeline import rag_advanced, initialize_llm, RagRetriever, EmbeddingManager, VectorStore
-
         st.sidebar.write("✅ Imports successful")
 
         embedding_manager = EmbeddingManager()
