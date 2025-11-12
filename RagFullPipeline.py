@@ -1,6 +1,3 @@
-RagFullPipeline.py
-
-
 import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
