@@ -69,26 +69,10 @@ def split_documents(documents, chunk_size=1000, chunk_overlap=200):
 class EmbeddingManager:
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
         self.model_name = model_name
-        # Force CPU usage and handle meta tensor issue
-        import os
-        os.environ["CUDA_VISIBLE_DEVICES"] = ""  # Force CPU
-        import torch
-        torch.set_default_device('cpu')
-
-        # Initialize model with CPU explicitly
-        self.model = SentenceTransformer(self.model_name, device='cpu')
-
-        # Additional safety for meta tensor issue
-        try:
-            # Test the model with a small input
-            test_embedding = self.model.encode(["test"], convert_to_tensor=True)
-        except Exception as e:
-            # Fallback: reload with different settings
-            self.model = SentenceTransformer(self.model_name)
-            self.model.to('cpu')
+        self.model = SentenceTransformer(self.model_name)
 
     def generate_embeddings(self, texts: List[str]) -> np.ndarray:
-        return self.model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
+        return self.model.encode(texts, show_progress_bar=True)
 
 
 class VectorStore:
@@ -111,7 +95,10 @@ class VectorStore:
 
         # Populate with documents if collection is empty and PDF folder is provided
         if self.collection.count() == 0 and self.pdf_folder:
+            print(f"Populating vector store from PDF folder: {self.pdf_folder}")
             self.populate_from_pdfs(self.pdf_folder)
+        else:
+            print(f"Vector store loaded with {self.collection.count()} documents")
 
     def _initialize_chroma_client(self):
         """Initialize ChromaDB client with proper error handling"""
@@ -131,11 +118,13 @@ class VectorStore:
             except ValueError as e:
                 if "already exists" in str(e) and attempt < max_retries - 1:
                     # Delete the conflicting database and retry
+                    print(f"Database conflict detected. Removing {self.persist_directory}...")
                     if os.path.exists(self.persist_directory):
                         shutil.rmtree(self.persist_directory)
                     os.makedirs(self.persist_directory, exist_ok=True)
                 else:
                     # Fallback to ephemeral on final failure
+                    print(f"Persistent storage failed: {e}. Using ephemeral client.")
                     return chromadb.EphemeralClient()
 
         # Final fallback
@@ -179,23 +168,32 @@ class VectorStore:
                     metadatas=new_metas[i:end_idx],
                     documents=new_texts[i:end_idx]
                 )
+            print(f"Added {len(new_ids)} new documents to vector store")
 
     def populate_from_pdfs(self, pdf_folder: str):
         """Load and process PDFs from the specified folder"""
         if not os.path.exists(pdf_folder):
+            print(f"PDF folder not found: {pdf_folder}")
             return
 
+        print(f"Processing PDFs from: {pdf_folder}")
         documents = process_all_pdfs(pdf_folder)
 
         if not documents:
+            print("No PDF documents found or processed")
             return
 
+        print(f"Loaded {len(documents)} documents from PDFs")
         split_docs = split_documents(documents)
+        print(f"Split into {len(split_docs)} chunks")
 
         embedding_manager = EmbeddingManager()
+        print("Generating embeddings...")
         embeddings = embedding_manager.generate_embeddings([doc.page_content for doc in split_docs])
+        print(f"Generated {len(embeddings)} embeddings")
 
         self.add_documents(split_docs, embeddings)
+        print("PDF population completed")
 
 
 class RagRetriever:
@@ -234,11 +232,10 @@ class RagRetriever:
 
 def rag_advanced(query, retriever, llm, top_k=5, min_score=0.2, return_context=False):
     if not GROQ_API_KEY:
-        return {'answer': 'API key not configured.', 'sources': [], 'confidence': 0.0, 'context': ''}
+        return {'answer': 'GROQ_API_KEY not found.', 'sources': [], 'confidence': 0.0, 'context': ''}
     results = retriever.retrieve(query, top_k=top_k, score_threshold=min_score)
     if not results:
-        return {'answer': 'No relevant legal sources found for this query.', 'sources': [], 'confidence': 0.0,
-                'context': ''}
+        return {'answer': 'No relevant context found.', 'sources': [], 'confidence': 0.0, 'context': ''}
     context = "\n\n".join([doc['content'] for doc in results])
     sources = [{'source': doc['metadata'].get('source_file', 'unknown'),
                 'page': str(doc['metadata'].get('page', 'unknown')),

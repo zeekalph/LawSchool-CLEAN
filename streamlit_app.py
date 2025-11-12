@@ -233,4 +233,3 @@ st.markdown(
     "⚠️ **Disclaimer:** This AI assistant provides legal information for educational purposes only. "
     "It does not constitute legal advice. Always consult a qualified attorney for legal matters."
 )
-
