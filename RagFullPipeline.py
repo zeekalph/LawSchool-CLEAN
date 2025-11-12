@@ -232,28 +232,61 @@ class RagRetriever:
 
 def rag_advanced(query, retriever, llm, top_k=5, min_score=0.2, return_context=False):
     if not GROQ_API_KEY:
-        return {'answer': 'GROQ_API_KEY not found.', 'sources': [], 'confidence': 0.0, 'context': ''}
+        return {'answer': 'API key not configured.', 'sources': [], 'confidence': 0.0, 'context': ''}
+
     results = retriever.retrieve(query, top_k=top_k, score_threshold=min_score)
-    if not results:
-        return {'answer': 'No relevant context found.', 'sources': [], 'confidence': 0.0, 'context': ''}
-    context = "\n\n".join([doc['content'] for doc in results])
+
+    LEGAL_EXPERT_PROMPT = """
+You are LEGAL-MAX, an elite AI legal scholar and research assistant. Your role is to provide comprehensive, accurate, and practical legal analysis.
+
+**CORE PRINCIPLES:**
+1. **PRECISION** - Use exact legal terminology and avoid oversimplification
+2. **CONTEXT-AWARE** - Ground analysis in provided legal sources when available
+3. **PRACTICAL FOCUS** - Bridge theoretical law with real-world application
+4. **MULTI-JURISDICTIONAL** - Acknowledge jurisdictional variations when relevant
+5. **CRITICAL ANALYSIS** - Identify strengths/weaknesses of legal arguments
+
+**RESPONSE FRAMEWORK:**
+1. **Executive Summary** - Brief overview of key legal principles
+2. **Core Legal Elements** - Breakdown of essential components  
+3. **Jurisdictional Context** - Relevant statutory/case law framework
+4. **Practical Application** - How this works in real scenarios
+5. **Key Precedents** - Important cases or statutes (when sources available)
+6. **Strategic Considerations** - Litigation/planning implications
+
+**SOURCE INTEGRATION:**
+- When legal sources are provided: "Based on the legal documents analyzed..."
+- When no sources: "Under general legal principles..."
+- Always cite specific provisions/cases when referencing sources
+- Acknowledge limitations of available sources
+
+**CONTEXT:**
+{context}
+
+**QUESTION:**
+{query}
+
+**EXPERT LEGAL ANALYSIS:**
+"""
+
+    context = "\n\n".join([doc['content'] for doc in
+                           results]) if results else "No specific legal sources available for this query. Providing general legal analysis based on established principles."
+
     sources = [{'source': doc['metadata'].get('source_file', 'unknown'),
                 'page': str(doc['metadata'].get('page', 'unknown')),
                 'score': doc['similarity_score'],
                 'preview': doc['content'][:120] + '...'} for doc in results]
-    confidence = max([doc['similarity_score'] for doc in results])
-    prompt = f"""
-You are an expert AI legal scholar.
-Context:
-{context if context else "No context found."}
-Question:
-{query}
-Answer:
-"""
+
+    confidence = max([doc['similarity_score'] for doc in results]) if results else 0.7
+
+    prompt = LEGAL_EXPERT_PROMPT.format(context=context, query=query)
+
     response = llm.invoke(prompt)
+
     output = {'answer': response.content, 'sources': sources, 'confidence': confidence}
     if return_context:
         output['context'] = context
+
     return output
 
 
