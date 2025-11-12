@@ -114,43 +114,16 @@ class EmbeddingManager:
 
 class VectorStore:
     def __init__(self, collection_name: str = "pdf_documents",
-                 persist_directory: str = "./vector_store"):
+                 persist_directory: str = "./prebuilt_vector_store"):
         self.collection_name = collection_name
         self.persist_directory = persist_directory
         self.client = None
         self.collection = None
         self._init_vectorstore()
-        self._ensure_documents_loaded()
-
-    def _ensure_documents_loaded(self):
-        if self.collection.count() == 0:
-            print("Vector store is empty - processing PDFs...")
-
-            possible_paths = ["app", "/mount/src/lawschool-clean/app", "./app"]
-            documents = []
-
-            for path in possible_paths:
-                pdf_dir = Path(path)
-                if pdf_dir.exists():
-                    pdf_files = list(pdf_dir.glob("**/*.pdf"))
-                    print(f"Found {len(pdf_files)} PDFs in {path}")
-                    if pdf_files:
-                        documents = process_all_pdfs(path)
-                        break
-
-            if documents:
-                split_docs = split_documents(documents)
-                embeddings = EmbeddingManager().generate_embeddings([doc.page_content for doc in split_docs])
-                self.add_documents(split_docs, embeddings)
-                print(f"Final document count: {self.collection.count()}")
-            else:
-                print("No PDFs found in any location")
 
     def _init_vectorstore(self):
         try:
-            os.makedirs(self.persist_directory, exist_ok=True)
             self.client = chromadb.PersistentClient(path=self.persist_directory)
-
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name,
                 metadata={"Description": "PDF document embedding for RAG"}
@@ -201,12 +174,22 @@ class VectorStore:
 
         if new_ids:
             try:
-                self.collection.add(
-                    ids=new_ids,
-                    embeddings=new_embeddings,
-                    metadatas=new_metas,
-                    documents=new_texts
-                )
+                batch_size = 1000
+                for i in range(0, len(new_ids), batch_size):
+                    end_idx = min(i + batch_size, len(new_ids))
+                    batch_ids = new_ids[i:end_idx]
+                    batch_texts = new_texts[i:end_idx]
+                    batch_metas = new_metas[i:end_idx]
+                    batch_embeddings = new_embeddings[i:end_idx]
+
+                    self.collection.add(
+                        ids=batch_ids,
+                        embeddings=batch_embeddings,
+                        metadatas=batch_metas,
+                        documents=batch_texts
+                    )
+                    print(f"Added batch {i // batch_size + 1}: {len(batch_ids)} documents")
+
                 print(f"Added {len(new_ids)} new documents to the vector store")
                 print(f"Total documents in collection: {self.collection.count()}")
             except Exception as e:
