@@ -16,7 +16,7 @@ else:
     from dotenv import load_dotenv
     load_dotenv()
 
-from app.RagFullPipeline import rag_advanced, initialize_llm, RagRetriever, EmbeddingManager, VectorStore
+from RagFullPipeline import rag_advanced, initialize_llm, RagRetriever, EmbeddingManager, VectorStore
 
 st.set_page_config(
     page_title="Law Study Buddy",
