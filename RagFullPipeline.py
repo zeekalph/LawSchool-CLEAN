@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 import numpy as np
 import uuid
 import hashlib
+import shutil
 
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -130,8 +131,30 @@ class VectorStore:
             )
             print(f"Vector store initialized. Collection: {self.collection_name}")
             print(f"Existing documents in collection: {self.collection.count()}")
+
+            if self.collection.count() == 0:
+                print("Vector store appears corrupted or empty. Rebuilding...")
+                self._rebuild_vectorstore()
+
         except Exception as e:
-            print(f"Error initializing vector store {e}")
+            print(f"Error initializing vector store: {e}")
+            print("Attempting to rebuild vector store...")
+            self._rebuild_vectorstore()
+
+    def _rebuild_vectorstore(self):
+        try:
+            if os.path.exists(self.persist_directory):
+                shutil.rmtree(self.persist_directory)
+
+            self.client = chromadb.PersistentClient(path=self.persist_directory)
+            self.collection = self.client.get_or_create_collection(
+                name=self.collection_name,
+                metadata={"Description": "PDF document embedding for RAG"}
+            )
+            print("Vector store rebuilt successfully")
+
+        except Exception as e:
+            print(f"Failed to rebuild vector store: {e}")
             raise
 
     def _doc_hash(self, text: str) -> str:

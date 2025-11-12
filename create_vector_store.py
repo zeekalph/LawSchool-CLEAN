@@ -3,7 +3,7 @@ import sys
 import time
 sys.path.append('app')
 
-from app.RagFullPipeline import process_all_pdfs, split_documents, EmbeddingManager, VectorStore
+from RagFullPipeline import process_all_pdfs, split_documents, EmbeddingManager, VectorStore
 import shutil
 
 print("Building vector store...")
